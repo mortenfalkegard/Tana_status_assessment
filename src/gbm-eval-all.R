@@ -1,9 +1,9 @@
 # Complete stock status assessment script
 
 library(triangle)
-library(xlsx)
-
-setwd("C:/Users/morten.falkegard/OneDrive - NINA/Tana monitoring group/Status assessment files")
+library(openxlsx)
+library(tidyverse)
+library(rio)
 
 estimate_mode <- function(x) {
   d <- density(x)
@@ -51,7 +51,7 @@ l <- 0 # this is a line counter for the results data frame
 # initiate river list
 #=====================
 
-river_list <- read.xlsx("gbm-eval-riverlist - all.xlsx", sheetIndex=1)
+river_list <- import("data/gbm-eval-riverlist.csv", encoding = "UTF-8")
 
 NumberOfRivers <- nrow(river_list)
 
@@ -80,32 +80,32 @@ for(r in 1:NumberOfRivers) {
   #====================================
   # Select status assessment procedure
   #====================================
-  if(river_list[r, "AssessProc"]==0) { 
+  if(river_list[r, "AssessProc"] == 0) { 
     
-    RiverFileName <- paste("gbm-nosizeclass-", river_list[r, "RiverName"], ".xlsx", sep="")
-    river_data <- read.xlsx(RiverFileName, sheetIndex=1)
+    RiverFileName <- paste("data/gbm-nosizeclass-", river_list[r, "RiverName"], ".csv", sep="")
+    river_data <- import(RiverFileName, encoding = "UTF-8")
   
     NumberOfYears <- nrow(river_data)
 
     if("VideoCount1SW" %in% colnames(river_data)) { #trib with video monitoring, i.e. Utsjoki
       
       for(i in 1:NumberOfYears) {
-        VideoKgTot[i] <- river_data[i, "VideoCount1SW"]*river_data[i, "AvgSize1SW"]+
-          river_data[i, "VideoCountMSW"]*river_data[i, "AvgSizeMSW"]
-        FemPropMedEst[i] <- (river_data[i, "VideoCount1SW"]*river_data[i, "AvgSize1SW"]*river_data[i, "FemProp1SW"]+
-                               river_data[i, "VideoCountMSW"]*river_data[i, "AvgSizeMSW"]*river_data[i, "FemPropMSW"])/VideoKgTot[i]
+        VideoKgTot[i] <- river_data[i, "VideoCount1SW"] * river_data[i, "AvgSize1SW"] +
+          river_data[i, "VideoCountMSW"] * river_data[i, "AvgSizeMSW"]
+        FemPropMedEst[i] <- (river_data[i, "VideoCount1SW"] * river_data[i, "AvgSize1SW"] * river_data[i, "FemProp1SW"] +
+                               river_data[i, "VideoCountMSW"] * river_data[i, "AvgSizeMSW"] * river_data[i, "FemPropMSW"]) / VideoKgTot[i]
         CatchTrib[i] <- river_data[i, "Catch"]
-        ExplStart[i] <- (river_data[i, "Catch"]/VideoKgTot[i]) #* 1.5 # multiply here to temporarily compensate for underreporting in Utsjoki
-        PfaTrib[i] <- CatchTrib[i]/ExplStart[i]
-        FemPropForFile[i+l] <- FemPropMedEst[i]
+        ExplStart[i] <- (river_data[i, "Catch"] / VideoKgTot[i]) #* 1.5 # multiply here to temporarily compensate for underreporting in Utsjoki
+        PfaTrib[i] <- CatchTrib[i] / ExplStart[i]
+        FemPropForFile[i + l] <- FemPropMedEst[i]
       }
       
     } else { # area without video, e.g. Tana main stem and Vetsi
       CatchTrib <- river_data[, "Catch"]
       ExplStart <- river_data[, "ExplStart"]
       FemPropMedEst <- river_data[, "FemProp"]
-      FemPropForFile[(1+l):(NumberOfYears+l)] <- FemPropMedEst
-      PfaTrib <- CatchTrib/ExplStart
+      FemPropForFile[(1 + l):(NumberOfYears + l)] <- FemPropMedEst
+      PfaTrib <- CatchTrib / ExplStart
     }
 
     # if TRUE, make exploitation adjustment based on correlation between trib and Tana total
@@ -119,40 +119,43 @@ for(r in 1:NumberOfRivers) {
       StdPfa <- sd(PfaTrib)
       
       for(i in 1:NumberOfYears) {
-        StdizedTrib[i] <- (CatchTrib[i]-AvgTrib)/StdTrib
-        StdizedTot[i] <- (river_data[i, "TanaTotal"]-AvgTot)/StdTot
-        StdizedPfa[i] <- (PfaTrib[i]-AvgPfa)/StdPfa
+        StdizedTrib[i] <- (CatchTrib[i] - AvgTrib) / StdTrib
+        StdizedTot[i] <- (river_data[i, "TanaTotal"] - AvgTot) / StdTot
+        StdizedPfa[i] <- (PfaTrib[i] - AvgPfa) / StdPfa
       }
       
       StdizedDiff <- StdizedTot - StdizedPfa
       DiffKG <- StdizedDiff * StdPfa
       
       for(i in 1:NumberOfYears) {
-        a <- (river_data[i, "UnrepMax"]-river_data[i, "UnrepMin"])/(max(StdizedDiff)-min(StdizedDiff))
+        a <- (river_data[i, "UnrepMax"] - river_data[i, "UnrepMin"]) / (max(StdizedDiff) - min(StdizedDiff))
         b <- river_data[i, "UnrepMax"] - (a * max(StdizedDiff))
         UnrepEst[i] <- river_data[i, "UnrepMax"] - (a * StdizedDiff[i] + b)
       }
       
-      PfaTribCorrected <- PfaTrib+DiffKG
-      ExplEstimate <- CatchTrib/PfaTribCorrected
-      ExplCorr <- (ExplEstimate-ExplStart)*river_data[i, "ExplCorrSoft"]
-      ExplMedEst <- ExplStart+ExplCorr
+      PfaTribCorrected <- PfaTrib + DiffKG
+      ExplEstimate <- CatchTrib / PfaTribCorrected
+      ExplCorr <- (ExplEstimate - ExplStart) * river_data[i, "ExplCorrSoft"]
+      ExplMedEst <- ExplStart + ExplCorr
+      
     } else { # no adjustment, use static numbers directly from Excel-files
+      
       ExplMedEst <- ExplStart
-      UnrepEst <- river_data[, "UnrepMed"]
-      ExplCorr <- ExplMedEst-ExplStart
+      UnrepEst <- river_data[ , "UnrepMed"]
+      ExplCorr <- ExplMedEst - ExplStart
+      
     }
     
     for(i in 1:NumberOfYears) {
       
-      fangstL <- ExplMedEst[i]*river_data[i, "ExplMin"]
+      fangstL <- ExplMedEst[i] * river_data[i, "ExplMin"]
       fangstM <- ExplMedEst[i]
-      fangstH <- ExplMedEst[i]*river_data[i, "ExplMax"]
+      fangstH <- ExplMedEst[i] * river_data[i, "ExplMax"]
       ExplRate <- rtriangle(k, fangstL, fangstH, fangstM)
       
-      fempropL <- FemPropMedEst[i]*river_data[i, "FemPropMin"]
+      fempropL <- FemPropMedEst[i] * river_data[i, "FemPropMin"]
       fempropM <- FemPropMedEst[i]
-      fempropH <- FemPropMedEst[i]*river_data[i, "FemPropMax"]
+      fempropH <- FemPropMedEst[i] * river_data[i, "FemPropMax"]
       FemProp <- rtriangle(k, fempropL, fempropH, fempropM)
     #  FemPropForFile[i+l] <- estimate_mode(FemProp)
       
@@ -160,56 +163,57 @@ for(r in 1:NumberOfRivers) {
       
       if(identical(IncludeUnreported, FALSE)) { UnrepEst[i] <- 0 }
       
-      UnreportedL <- UnrepEst[i]*0.9 #river_data[i, "UnrepMin"]
+      UnreportedL <- UnrepEst[i] * 0.9 #river_data[i, "UnrepMin"]
       UnreportedM <- UnrepEst[i]  #river_data[i, "UnrepMed"]
-      UnreportedH <- UnrepEst[i]*1.1 #river_data[i, "UnrepMax"]
+      UnreportedH <- UnrepEst[i] * 1.1 #river_data[i, "UnrepMax"]
       Unreported <- rtriangle(k, UnreportedL, UnreportedH, UnreportedM)
-      UnrepForFile[i+l] <- UnreportedM
+      UnrepForFile[i + l] <- UnreportedM
       
-      CatchCorrected <- CatchStat / (1-Unreported)
-      CatchForFile[i+l] <- estimate_mode(CatchCorrected)
-      OrigCatchForFile[i+l] <- CatchStat
+      CatchCorrected <- CatchStat / (1 - Unreported)
+      CatchForFile[i + l] <- estimate_mode(CatchCorrected)
+      OrigCatchForFile[i + l] <- CatchStat
       
       PFA <- CatchStat / ExplRate
       SpawnEst <- PFA - CatchCorrected
       SpawnFem <- SpawnEst * FemProp
       
-      Spawn_W_mod[i+l] <- estimate_mode(SpawnFem)
-      Spawn_W_min[i+l] <- min(SpawnFem)
-      Spawn_W_max[i+l] <- max(SpawnFem)
-      Spawn_W_med[i+l] <- median(SpawnFem)
+      Spawn_W_mod[i + l] <- estimate_mode(SpawnFem)
+      Spawn_W_min[i + l] <- min(SpawnFem)
+      Spawn_W_max[i + l] <- max(SpawnFem)
+      Spawn_W_med[i + l] <- median(SpawnFem)
     
-      SpawnFemClean <- rtriangle(k,Spawn_W_min[i+l],Spawn_W_max[i+l],Spawn_W_mod[i+l])
+      SpawnFemClean <- rtriangle(k,Spawn_W_min[i + l],Spawn_W_max[i + l],Spawn_W_mod[i + l])
       GBM_attain <- which(SpawnFemClean >= GBM_dist)
-      GBM_maal[i+l] <- mean(SpawnFemClean/GBM_dist)
-      GBM_prob[i+l] <- length(GBM_attain) / k
+      GBM_maal[i + l] <- mean(SpawnFemClean / GBM_dist)
+      GBM_prob[i + l] <- length(GBM_attain) / k
       
-      Expl_L[i+l] <- min(ExplRate)
-      Expl_H[i+l] <- max(ExplRate)
-      Expl_M[i+l] <- estimate_mode(ExplRate)
-      ExplAdj[i+l] <- ExplCorr[i]
+      Expl_L[i + l] <- min(ExplRate)
+      Expl_H[i + l] <- max(ExplRate)
+      Expl_M[i + l] <- estimate_mode(ExplRate)
+      ExplAdj[i + l] <- ExplCorr[i]
       
-      RiverNumber[i+l] <- river_list[r, "RiverNumber"]
-      RiverList[i+l] <- paste(river_list[r, "RiverFullName"])
-      RiverYear[i+l] <- river_data[i, "Year"]
+      RiverNumber[i + l] <- river_list[r, "RiverNumber"]
+      RiverList[i + l] <- paste(river_list[r, "RiverFullName"])
+      RiverYear[i + l] <- river_data[i, "Year"]
     }
-  } #end of nosizeclass-evaluation
+  } # end of nosizeclass-evaluation
   
-  else if(river_list[r, "AssessProc"]==1) { # sizeclass-evaluation here 
+  else if(river_list[r, "AssessProc"] == 1) { # sizeclass-evaluation here 
 
-    RiverFileName <- paste("gbm-sizeclass-", river_list[r, "RiverName"], ".xlsx", sep="")
-    river_data <- read.xlsx(RiverFileName, sheetIndex=1)
+    RiverFileName <- paste("data/gbm-sizeclass-", river_list[r, "RiverName"], ".csv", sep="")
+    river_data <- import(RiverFileName, encoding = "UTF-8")
     
     NumberOfYears <- nrow(river_data)
 
-    CatchTrib <- river_data[1:NumberOfYears, "Catch_G"]+river_data[1:NumberOfYears, "Catch_M"]+river_data[1:NumberOfYears, "Catch_S"]
+    CatchTrib <- river_data[1:NumberOfYears, "Catch_G"] + river_data[1:NumberOfYears, "Catch_M"] + river_data[1:NumberOfYears, "Catch_S"]
+
     for(i in 1:NumberOfYears) {
-      ExplStart[i] <- CatchTrib[i]/(river_data[i, "Catch_G"]/river_data[i, "ExplStart_G"]+
-                                      river_data[i, "Catch_M"]/river_data[i, "ExplStart_M"]+
-                                      river_data[i, "Catch_S"]/river_data[i, "ExplStart_S"])
-      FemPropMedEst[i] <- (river_data[i, "FemProp_G"]*river_data[i, "Catch_G"]+
-                             river_data[i, "FemProp_M"]*river_data[i, "Catch_M"]+
-                             river_data[i, "FemProp_S"]*river_data[i, "Catch_S"])/CatchTrib[i]
+      ExplStart[i] <- CatchTrib[i] / (river_data[i, "Catch_G"] / river_data[i, "ExplStart_G"] +
+                                      river_data[i, "Catch_M"] / river_data[i, "ExplStart_M"] +
+                                      river_data[i, "Catch_S"] / river_data[i, "ExplStart_S"])
+      FemPropMedEst[i] <- (river_data[i, "FemProp_G"] * river_data[i, "Catch_G"] +
+                             river_data[i, "FemProp_M"] * river_data[i, "Catch_M"] +
+                             river_data[i, "FemProp_S"] * river_data[i, "Catch_S"]) / CatchTrib[i]
       FemPropForFile[i+l] <- FemPropMedEst[i]
       PfaTrib[i] <- CatchTrib[i]/ExplStart[i]
     }
@@ -226,48 +230,55 @@ for(r in 1:NumberOfRivers) {
       StdPfa <- sd(PfaTrib)
       
       for(i in 1:NumberOfYears) {
-        StdizedTrib[i] <- (CatchTrib[i]-AvgTrib)/StdTrib
-        StdizedTot[i] <- (river_data[i, "TanaTotal"]-AvgTot)/StdTot
-        StdizedPfa[i] <- (PfaTrib[i]-AvgPfa)/StdPfa
+        StdizedTrib[i] <- (CatchTrib[i] - AvgTrib) / StdTrib
+        StdizedTot[i] <- (river_data[i, "TanaTotal"] - AvgTot) / StdTot
+        StdizedPfa[i] <- (PfaTrib[i] - AvgPfa) / StdPfa
       }
       
       StdizedDiff <- StdizedTot - StdizedPfa
       DiffKG <- StdizedDiff * StdPfa
       
-      PfaTribCorrected <- PfaTrib+DiffKG
-      ExplEstimate <- CatchTrib/PfaTribCorrected
-      ExplCorr <- (ExplEstimate-ExplStart)*river_data[i, "ExplCorrSoft"]
-      ExplMedEst <- ExplStart+ExplCorr
+      PfaTribCorrected <- PfaTrib + DiffKG
+      ExplEstimate <- CatchTrib / PfaTribCorrected
+      ExplCorr <- (ExplEstimate - ExplStart) * river_data[i, "ExplCorrSoft"]
+      ExplMedEst <- ExplStart + ExplCorr
+      
     } else { # no adjustment, use static numbers directly from Excel-files
+      
       ExplMedEst <- ExplStart
-      ExplCorr <- ExplMedEst-ExplStart
+      ExplCorr <- ExplMedEst - ExplStart
+      
     }
     
     for(i in 1:NumberOfYears) {
-      fangst_G_med <- river_data[i, "ExplStart_G"]+ExplCorr[i]
-      fangst_G_min <- fangst_G_med*river_data[i, "ExplMin"]
-      fangst_G_max <- fangst_G_med*river_data[i, "ExplMax"]
+      fangst_G_med <- river_data[i, "ExplStart_G"] + ExplCorr[i]
+      fangst_G_min <- fangst_G_med * river_data[i, "ExplMin"]
+      fangst_G_max <- fangst_G_med * river_data[i, "ExplMax"]
       ExplRate_G <- rtriangle(k, fangst_G_min, fangst_G_max, fangst_G_med)
-      fangst_M_med <- river_data[i, "ExplStart_M"]+ExplCorr[i]
-      fangst_M_min <- fangst_M_med*river_data[i, "ExplMin"]
-      fangst_M_max <- fangst_M_med*river_data[i, "ExplMax"]
+      
+      fangst_M_med <- river_data[i, "ExplStart_M"] + ExplCorr[i]
+      fangst_M_min <- fangst_M_med * river_data[i, "ExplMin"]
+      fangst_M_max <- fangst_M_med * river_data[i, "ExplMax"]
       ExplRate_M <- rtriangle(k, fangst_M_min, fangst_M_max, fangst_M_med)
-      fangst_S_med <- river_data[i, "ExplStart_S"]+ExplCorr[i]
-      fangst_S_min <- fangst_S_med*river_data[i, "ExplMin"]
-      fangst_S_max <- fangst_S_med*river_data[i, "ExplMax"]
+      
+      fangst_S_med <- river_data[i, "ExplStart_S"] + ExplCorr[i]
+      fangst_S_min <- fangst_S_med * river_data[i, "ExplMin"]
+      fangst_S_max <- fangst_S_med * river_data[i, "ExplMax"]
       ExplRate_S <- rtriangle(k, fangst_S_min, fangst_S_max, fangst_S_med)
       
       femprop_G_med <- river_data[i, "FemProp_G"]
-      femprop_G_min <- femprop_G_med*river_data[i, "FemPropMin"]
-      femprop_G_max <- femprop_G_med*river_data[i, "FemPropMax"]
+      femprop_G_min <- femprop_G_med * river_data[i, "FemPropMin"]
+      femprop_G_max <- femprop_G_med * river_data[i, "FemPropMax"]
       sexratio_G <- rtriangle(k, femprop_G_min, femprop_G_max, femprop_G_med)
+      
       femprop_M_med <- river_data[i, "FemProp_M"]
-      femprop_M_min <- femprop_M_med*river_data[i, "FemPropMin"]
-      femprop_M_max <- femprop_M_med*river_data[i, "FemPropMax"]
+      femprop_M_min <- femprop_M_med * river_data[i, "FemPropMin"]
+      femprop_M_max <- femprop_M_med * river_data[i, "FemPropMax"]
       sexratio_M <- rtriangle(k, femprop_M_min, femprop_M_max, femprop_M_med)
+      
       femprop_S_med <- river_data[i, "FemProp_S"]
-      femprop_S_min <- femprop_S_med*river_data[i, "FemPropMin"]
-      femprop_S_max <- femprop_S_med*river_data[i, "FemPropMax"]
+      femprop_S_min <- femprop_S_med * river_data[i, "FemPropMin"]
+      femprop_S_max <- femprop_S_med * river_data[i, "FemPropMax"]
       sexratio_S <- rtriangle(k, femprop_S_min, femprop_S_max, femprop_S_med)
 
       if(isTRUE(IncludeUnreported)) {
@@ -280,13 +291,13 @@ for(r in 1:NumberOfRivers) {
         UnreportedH <- 0
       }
       Unreported <- rtriangle(k, UnreportedL, UnreportedH, UnreportedM)
-      UnrepForFile[i+l] <- UnreportedM
+      UnrepForFile[i + l] <- UnreportedM
       
-      CatchCorrected_G <- river_data[i, "Catch_G"] / (1-Unreported)
-      CatchCorrected_M <- river_data[i, "Catch_M"] / (1-Unreported)
-      CatchCorrected_S <- river_data[i, "Catch_S"] / (1-Unreported)
-      CatchForFile[i+l] <- estimate_mode(CatchCorrected_G) + estimate_mode(CatchCorrected_M) + estimate_mode(CatchCorrected_S)
-      OrigCatchForFile[i+l] <- river_data[i, "Catch_G"]+river_data[i, "Catch_M"]+river_data[i, "Catch_S"]
+      CatchCorrected_G <- river_data[i, "Catch_G"] / (1 - Unreported)
+      CatchCorrected_M <- river_data[i, "Catch_M"] / (1 - Unreported)
+      CatchCorrected_S <- river_data[i, "Catch_S"] / (1 - Unreported)
+      CatchForFile[i + l] <- estimate_mode(CatchCorrected_G) + estimate_mode(CatchCorrected_M) + estimate_mode(CatchCorrected_S)
+      OrigCatchForFile[i + l] <- river_data[i, "Catch_G"] + river_data[i, "Catch_M"] + river_data[i, "Catch_S"]
       
       PFA_G <- river_data[i, "Catch_G"] / ExplRate_G
       PFA_M <- river_data[i, "Catch_M"] / ExplRate_M
@@ -298,31 +309,31 @@ for(r in 1:NumberOfRivers) {
       
       SpawnFem <- (SpawnEst_G * sexratio_G) + (SpawnEst_M * sexratio_M) + (SpawnEst_S * sexratio_S)
 
-      Spawn_W_mod[i+l] <- estimate_mode(SpawnFem)
-      Spawn_W_min[i+l] <- min(SpawnFem)
-      Spawn_W_max[i+l] <- max(SpawnFem)
-      Spawn_W_med[i+l] <- median(SpawnFem)
+      Spawn_W_mod[i + l] <- estimate_mode(SpawnFem)
+      Spawn_W_min[i + l] <- min(SpawnFem)
+      Spawn_W_max[i + l] <- max(SpawnFem)
+      Spawn_W_med[i + l] <- median(SpawnFem)
       
-      SpawnFemClean <- rtriangle(k,Spawn_W_min[i+l],Spawn_W_max[i+l],Spawn_W_mod[i+l])
+      SpawnFemClean <- rtriangle(k, Spawn_W_min[i + l], Spawn_W_max[i + l], Spawn_W_mod[i + l])
       GBM_attain <- which(SpawnFemClean >= GBM_dist)
-      GBM_maal[i+l] <- mean(SpawnFemClean/GBM_dist)
-      GBM_prob[i+l] <- length(GBM_attain) / k
+      GBM_maal[i + l] <- mean(SpawnFemClean / GBM_dist)
+      GBM_prob[i + l] <- length(GBM_attain) / k
       
-      Expl_L[i+l] <- ExplMedEst[i]*river_data[i, "ExplMin"]
-      Expl_H[i+l] <- ExplMedEst[i]*river_data[i, "ExplMax"]
-      Expl_M[i+l] <- ExplMedEst[i]
-      ExplAdj[i+l] <- ExplCorr[i]
+      Expl_L[i + l] <- ExplMedEst[i] * river_data[i, "ExplMin"]
+      Expl_H[i + l] <- ExplMedEst[i] * river_data[i, "ExplMax"]
+      Expl_M[i + l] <- ExplMedEst[i]
+      ExplAdj[i + l] <- ExplCorr[i]
       
-      RiverNumber[i+l] <- river_list[r, "RiverNumber"]
-      RiverList[i+l] <- paste(river_list[r, "RiverFullName"])
-      RiverYear[i+l] <- river_data[i, "Year"]
+      RiverNumber[i + l] <- river_list[r, "RiverNumber"]
+      RiverList[i + l] <- paste(river_list[r, "RiverFullName"])
+      RiverYear[i + l] <- river_data[i, "Year"]
     }
-  } else if(river_list[r, "AssessProc"]==2) { # Polmak special assessment procedure here
+  } else if(river_list[r, "AssessProc"] == 2) { # Polmak special assessment procedure here
     
     CatchCount <- vector()
     SnorkCount <- vector()
     
-    river_data <- read.xlsx("gbm-Polmak.xlsx", sheetIndex=1)
+    river_data <- import("data/gbm-Polmak.csv", encoding = "UTF-8")
     NumberOfYears <- nrow(river_data)
 
     
@@ -347,9 +358,9 @@ for(r in 1:NumberOfRivers) {
       ExplStart[i] <- median(CatchCount[i] / (CatchCount[i] + SnorkEst))
       
       FemPropMedEst[i] <- river_data[i, "FemProp"]
-      FemPropForFile[i+l] <- FemPropMedEst[i]        
+      FemPropForFile[i + l] <- FemPropMedEst[i]        
       
-      PfaTrib[i] <- CatchTrib[i]/ExplStart[i]
+      PfaTrib[i] <- CatchTrib[i] / ExplStart[i]
     }
 
     if(isTRUE(MakeAdjustment)) {
@@ -363,33 +374,33 @@ for(r in 1:NumberOfRivers) {
       StdPfa <- sd(PfaTrib)
       
       for(i in 1:NumberOfYears) {
-        StdizedTrib[i] <- (CatchTrib[i]-AvgTrib)/StdTrib
-        StdizedTot[i] <- (river_data[i, "TanaTotal"]-AvgTot)/StdTot
-        StdizedPfa[i] <- (PfaTrib[i]-AvgPfa)/StdPfa
+        StdizedTrib[i] <- (CatchTrib[i] - AvgTrib) / StdTrib
+        StdizedTot[i] <- (river_data[i, "TanaTotal"] - AvgTot) / StdTot
+        StdizedPfa[i] <- (PfaTrib[i] - AvgPfa) / StdPfa
       }
       
       StdizedDiff <- StdizedTot - StdizedPfa
       DiffKG <- StdizedDiff * StdPfa
       
-      PfaTribCorrected <- PfaTrib+DiffKG
-      ExplEstimate <- CatchTrib/PfaTribCorrected
-      ExplCorr <- (ExplEstimate-ExplStart)*river_data[i, "ExplCorrSoft"]
-      ExplMedEst <- ExplStart+ExplCorr
+      PfaTribCorrected <- PfaTrib + DiffKG
+      ExplEstimate <- CatchTrib / PfaTribCorrected
+      ExplCorr <- (ExplEstimate - ExplStart) * river_data[i, "ExplCorrSoft"]
+      ExplMedEst <- ExplStart + ExplCorr
     } else { # no adjustment, use static numbers directly from Excel-files
       ExplMedEst <- ExplStart
-      ExplCorr <- ExplMedEst-ExplStart
+      ExplCorr <- ExplMedEst - ExplStart
     }
     
     for(i in 1:NumberOfYears) {
       
-      fangstL <- ExplMedEst[i]*river_data[i, "ExplMin"]
+      fangstL <- ExplMedEst[i] * river_data[i, "ExplMin"]
       fangstM <- ExplMedEst[i]
-      fangstH <- ExplMedEst[i]*river_data[i, "ExplMax"]
+      fangstH <- ExplMedEst[i] * river_data[i, "ExplMax"]
       ExplRate <- rtriangle(k, fangstL, fangstH, fangstM)
       
-      fempropL <- FemPropMedEst[i]*river_data[i, "FemPropMin"]
+      fempropL <- FemPropMedEst[i] * river_data[i, "FemPropMin"]
       fempropM <- FemPropMedEst[i]
-      fempropH <- FemPropMedEst[i]*river_data[i, "FemPropMax"]
+      fempropH <- FemPropMedEst[i] * river_data[i, "FemPropMax"]
       FemProp <- rtriangle(k, fempropL, fempropH, fempropM)
       
       if(isTRUE(IncludeUnreported)) {
@@ -402,74 +413,74 @@ for(r in 1:NumberOfRivers) {
         UnreportedH <- 0
       }
       Unreported <- rtriangle(k, UnreportedL, UnreportedH, UnreportedM)
-      UnrepForFile[i+l] <- UnreportedM
+      UnrepForFile[i + l] <- UnreportedM
       
-      CatchCorrected <- CatchTrib[i] / (1-Unreported)
-      CatchForFile[i+l] <- estimate_mode(CatchCorrected)
-      OrigCatchForFile[i+l] <- CatchTrib[i]
+      CatchCorrected <- CatchTrib[i] / (1 - Unreported)
+      CatchForFile[i + l] <- estimate_mode(CatchCorrected)
+      OrigCatchForFile[i + l] <- CatchTrib[i]
       
       PFA <- CatchTrib[i] / ExplRate
       SpawnEst <- PFA - CatchCorrected
       SpawnFem <- SpawnEst * FemProp
       
-      Spawn_W_mod[i+l] <- estimate_mode(SpawnFem)
-      Spawn_W_min[i+l] <- min(SpawnFem)
-      Spawn_W_max[i+l] <- max(SpawnFem)
-      Spawn_W_med[i+l] <- median(SpawnFem)
+      Spawn_W_mod[i + l] <- estimate_mode(SpawnFem)
+      Spawn_W_min[i + l] <- min(SpawnFem)
+      Spawn_W_max[i + l] <- max(SpawnFem)
+      Spawn_W_med[i + l] <- median(SpawnFem)
       
-      SpawnFemClean <- rtriangle(k,Spawn_W_min[i+l],Spawn_W_max[i+l],Spawn_W_mod[i+l])
+      SpawnFemClean <- rtriangle(k, Spawn_W_min[i + l], Spawn_W_max[i + l], Spawn_W_mod[i + l])
       GBM_attain <- which(SpawnFemClean >= GBM_dist)
-      GBM_maal[i+l] <- mean(SpawnFemClean/GBM_dist)
-      GBM_prob[i+l] <- length(GBM_attain) / k
+      GBM_maal[i + l] <- mean(SpawnFemClean / GBM_dist)
+      GBM_prob[i + l] <- length(GBM_attain) / k
       
-      Expl_L[i+l] <- min(ExplRate)
-      Expl_H[i+l] <- max(ExplRate)
-      Expl_M[i+l] <- estimate_mode(ExplRate)
-      ExplAdj[i+l] <- ExplCorr[i]
+      Expl_L[i + l] <- min(ExplRate)
+      Expl_H[i + l] <- max(ExplRate)
+      Expl_M[i + l] <- estimate_mode(ExplRate)
+      ExplAdj[i + l] <- ExplCorr[i]
       
-      RiverNumber[i+l] <- river_list[r, "RiverNumber"]
-      RiverList[i+l] <- paste(river_list[r, "RiverFullName"])
-      RiverYear[i+l] <- river_data[i, "Year"]
+      RiverNumber[i + l] <- river_list[r, "RiverNumber"]
+      RiverList[i + l] <- paste(river_list[r, "RiverFullName"])
+      RiverYear[i + l] <- river_data[i, "Year"]
     }
-  } else if(river_list[r, "AssessProc"]==3) { # Akujoki (and other snorkeling tribs) here
+  } else if(river_list[r, "AssessProc"] == 3) { # Akujoki (and other snorkeling tribs) here
     
-    RiverFileName <- paste("gbm-snork-", river_list[r, "RiverName"], ".xlsx", sep="")
-    river_data <- read.xlsx(RiverFileName, sheetIndex=1)
+    RiverFileName <- paste("data/gbm-snork-", river_list[r, "RiverName"], ".csv", sep="")
+    river_data <- import(RiverFileName, encoding = "UTF-8")
     
     NumberOfYears <- nrow(river_data)
     
     for(i in 1:NumberOfYears) {
-      if(river_data[i, "EstMethod"]==1) { # year with snorkeling data
+      if(river_data[i, "EstMethod"] == 1) { # year with snorkeling data
         diveuncG_M <- river_data[i, "diveuncG_M"] # median diving uncertainty, grilse
-        diveuncG_L <- diveuncG_M*river_data[i, "diveuncMin"]
-        diveuncG_H <- diveuncG_M*river_data[i, "diveuncMax"]
+        diveuncG_L <- diveuncG_M * river_data[i, "diveuncMin"]
+        diveuncG_H <- diveuncG_M * river_data[i, "diveuncMax"]
         diveunc_G <- rtriangle(k, diveuncG_L, diveuncG_H, diveuncG_M)
         
         diveuncM_M <- river_data[i, "diveuncM_M"] # median diving uncertainty, MSW
-        diveuncM_L <- diveuncM_M*river_data[i, "diveuncMin"]
-        diveuncM_H <- diveuncM_M*river_data[i, "diveuncMax"]
+        diveuncM_L <- diveuncM_M * river_data[i, "diveuncMin"]
+        diveuncM_H <- diveuncM_M * river_data[i, "diveuncMax"]
         diveunc_M <- rtriangle(k, diveuncM_L, diveuncM_H, diveuncM_M)
         
         femprop_G_med <- river_data[i, "FemProp_G"]
-        femprop_G_min <- femprop_G_med*river_data[i, "FemPropMin"]
-        femprop_G_max <- femprop_G_med*river_data[i, "FemPropMax"]
+        femprop_G_min <- femprop_G_med * river_data[i, "FemPropMin"]
+        femprop_G_max <- femprop_G_med * river_data[i, "FemPropMax"]
         sexratio_G <- rtriangle(k, femprop_G_min, femprop_G_max, femprop_G_med)
         femprop_M_med <- river_data[i, "FemProp_M"]
-        femprop_M_min <- femprop_M_med*river_data[i, "FemPropMin"]
-        femprop_M_max <- femprop_M_med*river_data[i, "FemPropMax"]
+        femprop_M_min <- femprop_M_med * river_data[i, "FemPropMin"]
+        femprop_M_max <- femprop_M_med * river_data[i, "FemPropMax"]
         sexratio_M <- rtriangle(k, femprop_M_min, femprop_M_max, femprop_M_med)
   
         sizeG_med <- river_data[i, "sizeG"] # average weight, 1SW female
-        sizeG_min <- sizeG_med*river_data[i, "sizeMin"]
-        sizeG_max <- sizeG_med*river_data[i, "sizeMax"]
+        sizeG_min <- sizeG_med * river_data[i, "sizeMin"]
+        sizeG_max <- sizeG_med * river_data[i, "sizeMax"]
         sizeG <- rtriangle(k, sizeG_min, sizeG_max, sizeG_med)
         sizeM_med <- river_data[i, "sizeM"] # average weight, MSW female
-        sizeM_min <- sizeM_med*river_data[i, "sizeMin"]
-        sizeM_max <- sizeM_med*river_data[i, "sizeMax"]
+        sizeM_min <- sizeM_med * river_data[i, "sizeMin"]
+        sizeM_max <- sizeM_med * river_data[i, "sizeMax"]
         sizeM <- rtriangle(k, sizeM_min, sizeM_max, sizeM_med)
   
-        divecount_G <- river_data[i, "Count_G"]/river_data[i, "AreaCover"] # number of grilse counted
-        divecount_M <- river_data[i, "Count_M"]/river_data[i, "AreaCover"] # number of MSW/PS counted
+        divecount_G <- river_data[i, "Count_G"] / river_data[i, "AreaCover"] # number of grilse counted
+        divecount_M <- river_data[i, "Count_M"] / river_data[i, "AreaCover"] # number of MSW/PS counted
         
         gyteest_G <- divecount_G * diveunc_G
         gyteest_M <- divecount_M * diveunc_M
@@ -477,48 +488,48 @@ for(r in 1:NumberOfRivers) {
         gytehunn_G <- gyteest_G * sexratio_G
         gytehunn_M <- gyteest_M * sexratio_M
         
-        FemPropForFile[i+l] <- estimate_mode((gytehunn_G + gytehunn_M)/(gyteest_G + gyteest_M))
+        FemPropForFile[i + l] <- estimate_mode((gytehunn_G + gytehunn_M) / (gyteest_G + gyteest_M))
         
         SpawnFem <- (gytehunn_G * sizeG) + (gytehunn_M * sizeM)
         
-        Spawn_W_mod[i+l] <- estimate_mode(SpawnFem)
-        Spawn_W_min[i+l] <- min(SpawnFem)
-        Spawn_W_max[i+l] <- max(SpawnFem)
-        Spawn_W_med[i+l] <- median(SpawnFem)
+        Spawn_W_mod[i + l] <- estimate_mode(SpawnFem)
+        Spawn_W_min[i + l] <- min(SpawnFem)
+        Spawn_W_max[i + l] <- max(SpawnFem)
+        Spawn_W_med[i + l] <- median(SpawnFem)
         
-        SpawnFemClean <- rtriangle(k,Spawn_W_min[i+l],Spawn_W_max[i+l],Spawn_W_mod[i+l])
+        SpawnFemClean <- rtriangle(k, Spawn_W_min[i + l], Spawn_W_max[i + l], Spawn_W_mod[i + l])
         GBM_attain <- which(SpawnFemClean >= GBM_dist)
-        GBM_maal[i+l] <- mean(SpawnFemClean/GBM_dist)
-        GBM_prob[i+l] <- length(GBM_attain) / k
+        GBM_maal[i + l] <- mean(SpawnFemClean/GBM_dist)
+        GBM_prob[i + l] <- length(GBM_attain) / k
   
-        Expl_L[i+l] <- 0
-        Expl_H[i+l] <- 0
-        Expl_M[i+l] <- 0
-        ExplAdj[i+l] <- 0
+        Expl_L[i + l] <- 0
+        Expl_H[i + l] <- 0
+        Expl_M[i + l] <- 0
+        ExplAdj[i + l] <- 0
         
-        UnrepForFile[i+l] <- 0
+        UnrepForFile[i + l] <- 0
         
-        RiverNumber[i+l] <- river_list[r, "RiverNumber"]
-        RiverList[i+l] <- paste(river_list[r, "RiverFullName"])
-        RiverYear[i+l] <- river_data[i, "Year"]
+        RiverNumber[i + l] <- river_list[r, "RiverNumber"]
+        RiverList[i + l] <- paste(river_list[r, "RiverFullName"])
+        RiverYear[i + l] <- river_data[i, "Year"]
         
-        CatchForFile[i+l] <- 0
-        OrigCatchForFile[i+l] <- 0
+        CatchForFile[i + l] <- 0
+        OrigCatchForFile[i + l] <- 0
         
       } else { # have to use main stem catch data as basis
         
         ExplMedEst[i] <- river_data[i, "ExplStart"]
-        fangstL <- ExplMedEst[i]*river_data[i, "ExplMin"]
+        fangstL <- ExplMedEst[i] * river_data[i, "ExplMin"]
         fangstM <- ExplMedEst[i]
-        fangstH <- ExplMedEst[i]*river_data[i, "ExplMax"]
+        fangstH <- ExplMedEst[i] * river_data[i, "ExplMax"]
         ExplRate <- rtriangle(k, fangstL, fangstH, fangstM)
         
         FemPropMedEst[i] <- river_data[i, "FemProp"]
-        fempropL <- FemPropMedEst[i]*river_data[i, "FemPropMin"]
+        fempropL <- FemPropMedEst[i] * river_data[i, "FemPropMin"]
         fempropM <- FemPropMedEst[i]
-        fempropH <- FemPropMedEst[i]*river_data[i, "FemPropMax"]
+        fempropH <- FemPropMedEst[i] * river_data[i, "FemPropMax"]
         FemProp <- rtriangle(k, fempropL, fempropH, fempropM)
-        FemPropForFile[i+l] <- estimate_mode(FemProp)
+        FemPropForFile[i + l] <- estimate_mode(FemProp)
 
         CatchStat <- river_data[i, "Catch"]
         
@@ -532,56 +543,55 @@ for(r in 1:NumberOfRivers) {
           UnreportedH <- 0
         }
         Unreported <- rtriangle(k, UnreportedL, UnreportedH, UnreportedM)
-        UnrepForFile[i+l] <- UnreportedM
+        UnrepForFile[i + l] <- UnreportedM
         
-        CatchCorrected <- CatchStat / (1-Unreported)
-        CatchForFile[i+l] <- estimate_mode(CatchCorrected)
-        OrigCatchForFile[i+l] <- CatchStat
+        CatchCorrected <- CatchStat / (1 - Unreported)
+        CatchForFile[i + l] <- estimate_mode(CatchCorrected)
+        OrigCatchForFile[i + l] <- CatchStat
         
         PFA <- CatchStat / ExplRate
         SpawnEst <- PFA - CatchCorrected
         SpawnFem <- SpawnEst * FemProp
         
-        Spawn_W_mod[i+l] <- estimate_mode(SpawnFem)
-        Spawn_W_min[i+l] <- min(SpawnFem)
-        Spawn_W_max[i+l] <- max(SpawnFem)
-        Spawn_W_med[i+l] <- median(SpawnFem)
+        Spawn_W_mod[i + l] <- estimate_mode(SpawnFem)
+        Spawn_W_min[i + l] <- min(SpawnFem)
+        Spawn_W_max[i + l] <- max(SpawnFem)
+        Spawn_W_med[i + l] <- median(SpawnFem)
         
-        SpawnFemClean <- rtriangle(k,Spawn_W_min[i+l],Spawn_W_max[i+l],Spawn_W_mod[i+l])
+        SpawnFemClean <- rtriangle(k, Spawn_W_min[i + l], Spawn_W_max[i + l], Spawn_W_mod[i + l])
         GBM_attain <- which(SpawnFemClean >= GBM_dist)
-        GBM_maal[i+l] <- mean(SpawnFemClean/GBM_dist)
-        GBM_prob[i+l] <- length(GBM_attain) / k
+        GBM_maal[i + l] <- mean(SpawnFemClean / GBM_dist)
+        GBM_prob[i + l] <- length(GBM_attain) / k
         
-        Expl_L[i+l] <- min(ExplRate)
-        Expl_H[i+l] <- max(ExplRate)
-        Expl_M[i+l] <- estimate_mode(ExplRate)
-        ExplAdj[i+l] <- 0
+        Expl_L[i + l] <- min(ExplRate)
+        Expl_H[i + l] <- max(ExplRate)
+        Expl_M[i + l] <- estimate_mode(ExplRate)
+        ExplAdj[i + l] <- 0
         
-        RiverNumber[i+l] <- river_list[r, "RiverNumber"]
-        RiverList[i+l] <- paste(river_list[r, "RiverFullName"])
-        RiverYear[i+l] <- river_data[i, "Year"]
+        RiverNumber[i + l] <- river_list[r, "RiverNumber"]
+        RiverList[i + l] <- paste(river_list[r, "RiverFullName"])
+        RiverYear[i + l] <- river_data[i, "Year"]
       }
     }
-    
   }
   
   # evaluate 4-year management targets throughout the evaluation period
   for (i in 1:NumberOfYears) {
-    if(i<4) {
-      GBM_4yr_maal[i+l] <- 0
-      GBM_4yr_prob[i+l] <- 0
-      Spawn4yrMin[i+l] <- 0
-      Spawn4yrMed[i+l] <- 0
-      Spawn4yrMax[i+l] <- 0
+    if(i < 4) {
+      GBM_4yr_maal[i + l] <- 0
+      GBM_4yr_prob[i + l] <- 0
+      Spawn4yrMin[i + l] <- 0
+      Spawn4yrMed[i + l] <- 0
+      Spawn4yrMax[i + l] <- 0
     } else {
-      j <- i-3
-      Spawn4yrMin[i+l] <- mean(Spawn_W_min[(j+l):(i+l)])
-      Spawn4yrMed[i+l] <- mean(Spawn_W_mod[(j+l):(i+l)])
-      Spawn4yrMax[i+l] <- mean(Spawn_W_max[(j+l):(i+l)])
-      gytehunn <- rtriangle(k,Spawn4yrMin[i+l],Spawn4yrMax[i+l],Spawn4yrMed[i+l])
+      j <- i - 3
+      Spawn4yrMin[i + l] <- mean(Spawn_W_min[(j + l):(i + l)])
+      Spawn4yrMed[i + l] <- mean(Spawn_W_mod[(j + l):(i + l)])
+      Spawn4yrMax[i + l] <- mean(Spawn_W_max[(j + l):(i + l)])
+      gytehunn <- rtriangle(k, Spawn4yrMin[i + l], Spawn4yrMax[i + l], Spawn4yrMed[i + l])
       GBM_4yr_attain <- which(gytehunn >= GBM_dist)
-      GBM_4yr_maal[i+l] <- mean(gytehunn/GBM_dist)
-      GBM_4yr_prob[i+l] <- length(GBM_4yr_attain) / k
+      GBM_4yr_maal[i + l] <- mean(gytehunn / GBM_dist)
+      GBM_4yr_prob[i + l] <- length(GBM_4yr_attain) / k
     }
   }
 
@@ -594,4 +604,5 @@ GBM_results <- data.frame(RiverNumber, RiverList, RiverYear, CatchForFile, OrigC
                           Spawn_W_mod, Spawn_W_min, Spawn_W_max, Spawn_W_med, 
                           GBM_maal, GBM_prob, Spawn4yrMin, Spawn4yrMed, Spawn4yrMax, 
                           GBM_4yr_maal, GBM_4yr_prob, Expl_L, Expl_M, Expl_H, ExplAdj, UnrepForFile)
-write.xlsx(GBM_results, "GBM_results.xlsx")
+
+export(GBM_results, "results/GBM_results.csv", ";", dec = ".", bom = TRUE)
