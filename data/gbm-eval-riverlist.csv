@@ -1,0 +1,18 @@
+﻿RiverNumber;RiverFullName;RiverName;AssessProc;GBM_low;GBM_med;GBM_high
+1;Tana MS;TMS;0;16642;22189;33284
+2;Maskejohka;Maskejohka;1;1100;1521;2000
+3;Pulmanki;Polmak;2;383;511;767
+4;Laksjohka;Laksjohka;1;864;1165;1747
+5;Vetsijoki;Vetsi;0;771;1101;1652
+6;Utsjoki;Uts;0;1486;2059;2972
+7;Kuoppilasjoki;Kuop;0;203;273;409
+8;Leavvajohka;Leavva;0;233;466;699
+9;Baisjohka;Bais;0;296;395;593
+10;Nilijoki;Nili;3;151;221;330
+11;Valjohka;Valjohka;1;508;779;1168
+12;Valjohka (alt);ValAlt;0;508;779;1168
+13;Akujoki;Aku;3;94;126;188
+14;Anarjohka;Anar;0;5928;7937;11906
+15;Karasjohka;Karasjohka;1;5468;7290;10936
+16;Iesjohka;Iesjohka;1;4278;6072;9107
+17;Tana total;Tana_tot;0;38510;52312;78070
