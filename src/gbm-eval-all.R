@@ -82,7 +82,7 @@ for(r in 1:NumberOfRivers) {
   #====================================
   if(river_list[r, "AssessProc"] == 0) { 
     
-    RiverFileName <- paste("data/gbm-nosizeclass-", river_list[r, "RiverName"], ".csv", sep="")
+    RiverFileName <- paste("data/rivers/gbm-nosizeclass-", river_list[r, "RiverName"], ".csv", sep="")
     river_data <- import(RiverFileName, encoding = "UTF-8")
   
     NumberOfYears <- nrow(river_data)
@@ -200,7 +200,7 @@ for(r in 1:NumberOfRivers) {
   
   else if(river_list[r, "AssessProc"] == 1) { # sizeclass-evaluation here 
 
-    RiverFileName <- paste("data/gbm-sizeclass-", river_list[r, "RiverName"], ".csv", sep="")
+    RiverFileName <- paste("data/rivers/gbm-sizeclass-", river_list[r, "RiverName"], ".csv", sep="")
     river_data <- import(RiverFileName, encoding = "UTF-8")
     
     NumberOfYears <- nrow(river_data)
@@ -333,7 +333,7 @@ for(r in 1:NumberOfRivers) {
     CatchCount <- vector()
     SnorkCount <- vector()
     
-    river_data <- import("data/gbm-Polmak.csv", encoding = "UTF-8")
+    river_data <- import("data/rivers/gbm-Polmak.csv", encoding = "UTF-8")
     NumberOfYears <- nrow(river_data)
 
     
@@ -444,7 +444,7 @@ for(r in 1:NumberOfRivers) {
     }
   } else if(river_list[r, "AssessProc"] == 3) { # Akujoki (and other snorkeling tribs) here
     
-    RiverFileName <- paste("data/gbm-snork-", river_list[r, "RiverName"], ".csv", sep="")
+    RiverFileName <- paste("data/rivers/gbm-snork-", river_list[r, "RiverName"], ".csv", sep="")
     river_data <- import(RiverFileName, encoding = "UTF-8")
     
     NumberOfYears <- nrow(river_data)
