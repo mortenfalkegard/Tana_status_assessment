@@ -1,7 +1,7 @@
 # coastal+river catch distribution script
 
 #library(triangle)
-library(openxlsx)
+#library(openxlsx)
 library(tidyverse)
 library(rio)
 
@@ -10,22 +10,22 @@ StartingYear <- "2018"
 NumberOfYears <- 1
 
 # obtain list of rivers with spawning targets, 1.5 kg proportions and PFA method
-river_list <- read.xlsx("catch-dist-riverlist.xlsx", sheet = 1, startRow = 1, colNames = TRUE)
+river_list <- import("data/catch-dist-riverlist.csv", encoding = "UTF-8")
 NumberOfRivers <- nrow(river_list) - 2 # -2 because last items of list are Other tribs and Tana total, currently not supported
 
 # obtain coastal catch distribution numbers (proportion of salmon from Tana in different coastal regions)
-coastal_dist <- read.xlsx("coastal-dist-table.xlsx", sheet = 1, startRow = 1, colNames = TRUE)
+coastal_dist <- import("data/coastal-dist-table.csv", encoding = "UTF-8")
 
 # obtain annual list of salmon catch (biomass) from coastal regions and Tana main stem 
-coastal_MS_catch <- read.xlsx("coastal-MS-catch.xlsx", sheet = 1, startRow = 1, colNames = TRUE)
+coastal_MS_catch <- import("data/coastal-MS-catch.csv", encoding = "UTF-8")
 j <- which(coastal_MS_catch$Year == StartingYear)
 YearList <- coastal_MS_catch[j:(j + NumberOfYears - 1), "Year"]
 
 # obtain annual list of main stem catch proportions of the different Tana stocks
-MS_catch_proportions <- read.xlsx("catch-dist-MS-props.xlsx", sheet = 1, startRow = 1, colNames = TRUE)
+MS_catch_proportions <- import("data/catch-dist-MS-props.csv", encoding = "UTF-8")
 
 # obtain status assessment results
-GBM_assess <- read.xlsx("GBM_results.xlsx", sheet = 1, startRow = 1, colNames = TRUE)
+GBM_assess <- import("results/GBM_results.csv", encoding = "UTF-8")
 
 # variable declarations
 TributaryCatch <- matrix(nrow = NumberOfYears, ncol = NumberOfRivers)
@@ -163,4 +163,4 @@ if(NumberOfYears > 3) {
   
 }
 
-write.xlsx(CatchDistResults, "Catch_Dist_results.xlsx")
+export(CatchDistResults, "results/Catch_Dist_results.csv", ";", dec = ".", bom = TRUE)
