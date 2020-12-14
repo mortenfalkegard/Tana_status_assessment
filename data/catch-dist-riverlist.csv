@@ -1,0 +1,18 @@
+﻿RiverNumber;RiverFullName;GBM_low;GBM_med;GBM_high;PropSize_1.5;PFA_method
+1;Tana MS;16642;22189;33284;0.0067;1
+2;Maskejohka;1100;1521;2000;0.0126;2
+3;Pulmanki;383;511;767;0.1512;2
+4;Laksjohka;864;1165;1747;0.0912;2
+5;Vetsijoki;771;1101;1652;0.024;2
+6;Utsjoki;1486;2059;2972;0.0234;2
+7;Kuoppilasjoki;203;273;409;0.185;1
+8;Leavvajohka;233;466;699;0.0937;1
+9;Baisjohka;296;395;593;0.1352;1
+10;Nilijoki;151;221;330;0.0918;1
+11;Valjohka (alt);508;779;1168;0.0579;1
+12;Akujoki;94;126;188;0.0936;1
+13;Anarjohka;5928;7937;11906;0.036;2
+14;Karasjohka;5468;7290;10936;0.0069;2
+15;Iesjohka;4278;6072;9107;0.0099;2
+16;Other tribs;849;1222;1832;0.1088;1
+17;Tana total;38277;51846;77371;0.0227;1
