@@ -7,7 +7,7 @@ library(rio)
 
 # variables defining starting year and number of years used in estimation
 StartingYear <- "2018"
-NumberOfYears <- 1
+NumberOfYears <- 3
 
 # obtain list of rivers with spawning targets, 1.5 kg proportions and PFA method
 river_list <- import("data/catch-dist-riverlist.csv", encoding = "UTF-8")
@@ -163,4 +163,8 @@ if(NumberOfYears > 3) {
   
 }
 
-export(CatchDistResults, "results/Catch_Dist_results.csv", ";", dec = ".", bom = TRUE)
+# construct filename with start year and ending year as part of the name
+EndingYear <- as.character(as.numeric(StartingYear) + NumberOfYears - 1)
+aar_streng <- str_c(StartingYear, "-", EndingYear)
+
+export(CatchDistResults, str_c("results/Catch_Dist_", aar_streng, ".csv"), ";", dec = ".", bom = TRUE)
