@@ -1,7 +1,7 @@
 # Complete stock status assessment script
 
 library(triangle)
-library(openxlsx)
+#library(openxlsx)
 library(tidyverse)
 library(rio)
 
