@@ -6,8 +6,8 @@ library(tidyverse)
 library(rio)
 
 # variables defining starting year and number of years used in estimation
-StartingYear <- "2018"
-NumberOfYears <- 3
+StartingYear <- "2017"
+NumberOfYears <- 4
 
 # obtain list of rivers with spawning targets, 1.5 kg proportions and PFA method
 river_list <- import("data/catch-dist-riverlist.csv", encoding = "UTF-8")
@@ -168,3 +168,23 @@ EndingYear <- as.character(as.numeric(StartingYear) + NumberOfYears - 1)
 aar_streng <- str_c(StartingYear, "-", EndingYear)
 
 export(CatchDistResults, str_c("results/Catch_Dist_", aar_streng, ".csv"), ";", dec = ".", bom = TRUE)
+
+
+# make list of annual numbers for each river/area
+catch_distribution <- data.frame(matrix(0, nrow = NumberOfRivers * NumberOfYears, ncol = 6,
+                                        dimnames = list(NULL, c("River", "Year", "Coastal_catch", "Mainstem_catch", "Tributary_catch", "Spawning_stock"))))
+
+i <- 1
+catch_distribution$River <- as.character(catch_distribution$River)
+for (j in 1:NumberOfRivers) {
+  l <- i + NumberOfYears - 1
+  catch_distribution$River[i:l] <- SumRiverList[j]
+  catch_distribution$Year[i:l] <- YearList[1:NumberOfYears]
+  catch_distribution$Coastal_catch[i:l] <- StockCoastalCatch[ , j]
+  catch_distribution$Mainstem_catch[i:l] <- MainStemCatch[ , j]
+  catch_distribution$Tributary_catch[i:l] <- TributaryCatch[ , j]
+  catch_distribution$Spawning_stock[i:l] <- TributarySpawn[ , j] / TributaryFemProp[ , j]
+  i <- i + NumberOfYears
+}
+
+export(catch_distribution, str_c("results/Annual_catch_dist_", aar_streng, ".csv"), ";", dec = ".", bom = TRUE)
