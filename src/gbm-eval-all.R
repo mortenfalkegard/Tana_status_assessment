@@ -473,44 +473,7 @@ for(r in 1:NumberOfRivers) {
         PfaTrib[i] <- CatchTrib[i] / ExplStart[i]
         
       } else { # year without fishing, only snorkeling counts
-        
-        diveuncG_M <- river_data[i, "diveuncG_M"] # median diving uncertainty, grilse
-        diveuncG_L <- diveuncG_M * river_data[i, "diveuncMin"]
-        diveuncG_H <- diveuncG_M * river_data[i, "diveuncMax"]
-        diveunc_G <- rtriangle(k, diveuncG_L, diveuncG_H, diveuncG_M)
-        
-        diveuncM_M <- river_data[i, "diveuncM_M"] # median diving uncertainty, MSW
-        diveuncM_L <- diveuncM_M * river_data[i, "diveuncMin"]
-        diveuncM_H <- diveuncM_M * river_data[i, "diveuncMax"]
-        diveunc_M <- rtriangle(k, diveuncM_L, diveuncM_H, diveuncM_M)
-        
-        femprop_G_med <- river_data[i, "FemProp_G"]
-        femprop_G_min <- femprop_G_med * river_data[i, "FemPropMin"]
-        femprop_G_max <- femprop_G_med * river_data[i, "FemPropMax"]
-        sexratio_G <- rtriangle(k, femprop_G_min, femprop_G_max, femprop_G_med)
-        femprop_M_med <- river_data[i, "FemProp_M"]
-        femprop_M_min <- femprop_M_med * river_data[i, "FemPropMin"]
-        femprop_M_max <- femprop_M_med * river_data[i, "FemPropMax"]
-        sexratio_M <- rtriangle(k, femprop_M_min, femprop_M_max, femprop_M_med)
-        
-        sizeG_med <- river_data[i, "sizeG"] # average weight, 1SW female
-        sizeG_min <- sizeG_med * river_data[i, "sizeMin"]
-        sizeG_max <- sizeG_med * river_data[i, "sizeMax"]
-        sizeG <- rtriangle(k, sizeG_min, sizeG_max, sizeG_med)
-        sizeM_med <- river_data[i, "sizeM"] # average weight, MSW female
-        sizeM_min <- sizeM_med * river_data[i, "sizeMin"]
-        sizeM_max <- sizeM_med * river_data[i, "sizeMax"]
-        sizeM <- rtriangle(k, sizeM_min, sizeM_max, sizeM_med)
-        
-        divecount_G <- river_data[i, "Count_G"] / river_data[i, "AreaCover"] # number of grilse counted
-        divecount_M <- river_data[i, "Count_M"] / river_data[i, "AreaCover"] # number of MSW/PS counted
-        
-        gyteest_G <- divecount_G * diveunc_G
-        gyteest_M <- divecount_M * diveunc_M
-        
-        gytehunn_G <- gyteest_G * sexratio_G
-        gytehunn_M <- gyteest_M * sexratio_M
-        
+
         ExplStart[i] <- 0
 
       }
@@ -609,7 +572,44 @@ for(r in 1:NumberOfRivers) {
         RiverYear[i + l] <- river_data[i, "Year"]
         
       } else {
-      
+        
+        diveuncG_M <- river_data[i, "diveuncG_M"] # median diving uncertainty, grilse
+        diveuncG_L <- diveuncG_M * river_data[i, "diveuncMin"]
+        diveuncG_H <- diveuncG_M * river_data[i, "diveuncMax"]
+        diveunc_G <- rtriangle(k, diveuncG_L, diveuncG_H, diveuncG_M)
+        
+        diveuncM_M <- river_data[i, "diveuncM_M"] # median diving uncertainty, MSW
+        diveuncM_L <- diveuncM_M * river_data[i, "diveuncMin"]
+        diveuncM_H <- diveuncM_M * river_data[i, "diveuncMax"]
+        diveunc_M <- rtriangle(k, diveuncM_L, diveuncM_H, diveuncM_M)
+        
+        femprop_G_med <- river_data[i, "FemProp_G"]
+        femprop_G_min <- femprop_G_med * river_data[i, "FemPropMin"]
+        femprop_G_max <- femprop_G_med * river_data[i, "FemPropMax"]
+        sexratio_G <- rtriangle(k, femprop_G_min, femprop_G_max, femprop_G_med)
+        femprop_M_med <- river_data[i, "FemProp_M"]
+        femprop_M_min <- femprop_M_med * river_data[i, "FemPropMin"]
+        femprop_M_max <- femprop_M_med * river_data[i, "FemPropMax"]
+        sexratio_M <- rtriangle(k, femprop_M_min, femprop_M_max, femprop_M_med)
+        
+        sizeG_med <- river_data[i, "sizeG"] # average weight, 1SW female
+        sizeG_min <- sizeG_med * river_data[i, "sizeMin"]
+        sizeG_max <- sizeG_med * river_data[i, "sizeMax"]
+        sizeG <- rtriangle(k, sizeG_min, sizeG_max, sizeG_med)
+        sizeM_med <- river_data[i, "sizeM"] # average weight, MSW female
+        sizeM_min <- sizeM_med * river_data[i, "sizeMin"]
+        sizeM_max <- sizeM_med * river_data[i, "sizeMax"]
+        sizeM <- rtriangle(k, sizeM_min, sizeM_max, sizeM_med)
+        
+        divecount_G <- river_data[i, "Count_G"] / river_data[i, "AreaCover"] # number of grilse counted
+        divecount_M <- river_data[i, "Count_M"] / river_data[i, "AreaCover"] # number of MSW/PS counted
+        
+        gyteest_G <- divecount_G * diveunc_G
+        gyteest_M <- divecount_M * diveunc_M
+        
+        gytehunn_G <- gyteest_G * sexratio_G
+        gytehunn_M <- gyteest_M * sexratio_M
+        
         FemPropForFile[i + l] <- estimate_mode((gytehunn_G + gytehunn_M) / (gyteest_G + gyteest_M))
         
         SpawnFem <- (gytehunn_G * sizeG) + (gytehunn_M * sizeM)
