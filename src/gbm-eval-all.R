@@ -1,7 +1,6 @@
 # Complete stock status assessment script
 
 library(triangle)
-#library(openxlsx)
 library(tidyverse)
 library(rio)
 
@@ -13,6 +12,8 @@ estimate_mode <- function(x) {
 #==============================
 # global variable declarations
 #==============================
+
+options(scipen = 999)
 
 k <- 10000
 
@@ -59,7 +60,7 @@ NumberOfRivers <- nrow(river_list)
 # loop through rivers
 #=====================
 
-for(r in 1:NumberOfRivers) {
+for (r in 1:NumberOfRivers) {
 
   StdizedTrib <- vector()
   StdizedTot <- vector()
@@ -221,7 +222,7 @@ for(r in 1:NumberOfRivers) {
         Expl_M[i + l] <- estimate_mode(ExplRate)
         ExplAdj[i + l] <- ExplCorr[i]
         
-      } else {
+      } else { # no fishing, evaluate through other means
         
         CatchCorrected <- CatchStat
         CatchForFile[i + l] <- CatchStat
